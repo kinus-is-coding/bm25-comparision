@@ -1,0 +1,514 @@
+{
+  "version": "2.0",
+  "description": "Hard-negative benchmark for video OCR/ASR retrieval. Compares Elasticsearch BM25 vs BGE-M3 + VLM Contextual Retrieval on semantic paraphrase queries.",
+  "total_queries": 10,
+  "negative_type_taxonomy": [
+    "same_entity_wrong_event",
+    "same_keywords_wrong_context",
+    "semantic_similarity_incorrect",
+    "ocr_asr_noise"
+  ],
+  "queries": [
+    {
+      "query_id": "Q01",
+      "query": "Tim Cook presents Apple's newest smartphone to the public",
+      "candidates": [
+        {
+          "video_id": "apple_iphone15_launch_2023",
+          "timestamp": "00:12:34",
+          "ocr": "iPhone 15 — Available September 22",
+          "asr": "Tim Cook introduced the new iPhone 15 generation at the Apple Park event, calling it the most advanced iPhone ever made.",
+          "vlm_caption": "A man in casual clothes stands on a stage in front of a large screen showing a smartphone. An audience applauds in an auditorium.",
+          "label": 1,
+          "negative_type": "positive"
+        },
+        {
+          "video_id": "apple_wwdc_2023",
+          "timestamp": "00:04:10",
+          "ocr": "Apple WWDC 2023 — Worldwide Developers Conference",
+          "asr": "Apple announced major software updates including iOS 17, macOS Sonoma, and new developer APIs.",
+          "vlm_caption": "A presenter stands on a stage with a large WWDC logo behind them. Developers in the audience look at their laptops and tablets.",
+          "label": 0,
+          "negative_type": "same_entity_wrong_event"
+        },
+        {
+          "video_id": "samsung_galaxy_s24_launch",
+          "timestamp": "00:08:45",
+          "ocr": "Samsung Galaxy S24 Ultra — AI Phone",
+          "asr": "Samsung's CEO unveiled the Galaxy S24 series, highlighting Galaxy AI features and the new titanium design.",
+          "vlm_caption": "A person holds up a thin smartphone with a stylus on a brightly lit stage. Product renders rotate on a large display behind them.",
+          "label": 0,
+          "negative_type": "semantic_similarity_incorrect"
+        },
+        {
+          "video_id": "apple_event_opening_2023",
+          "timestamp": "00:02:15",
+          "ocr": "Apple Event — September 2023 Wonderlust",
+          "asr": "Welcome to the Apple Wonderlust event. Today we have an amazing lineup of announcements for you.",
+          "vlm_caption": "An aerial flyover of the Apple Park campus at sunrise. The Apple logo glows on the curved roof of the main building.",
+          "label": 0,
+          "negative_type": "same_keywords_wrong_context"
+        },
+        {
+          "video_id": "apple_iphone14_repair_guide",
+          "timestamp": "00:01:05",
+          "ocr": "iPhne 14 Repiar Gudie — Scrn Repalcement",
+          "asr": "In this video we show how to replace the iPhone screen. Apple phone repair tutorial step by step.",
+          "vlm_caption": "Close-up of hands using small tools to disassemble a smartphone on a white workbench. Small screws and components are laid out.",
+          "label": 0,
+          "negative_type": "ocr_asr_noise"
+        }
+      ]
+    },
+    {
+      "query_id": "Q02",
+      "query": "Elon Musk gives the first electric pickup truck to buyers",
+      "candidates": [
+        {
+          "video_id": "tesla_cybertruck_delivery_2023",
+          "timestamp": "00:15:22",
+          "ocr": "Tesla Cybertruck Delivery Event",
+          "asr": "Elon Musk delivered the first Cybertruck vehicles to customers, marking the start of production deliveries for the electric pickup truck.",
+          "vlm_caption": "A man in a dark shirt hands car keys to customers in front of angular stainless steel pickup trucks under bright spotlights in a large factory hall.",
+          "label": 1,
+          "negative_type": "positive"
+        },
+        {
+          "video_id": "tesla_model_s_production_update",
+          "timestamp": "00:03:40",
+          "ocr": "Tesla Model S — Production Update Q3",
+          "asr": "Tesla reported record production numbers for Model S and Model X, with strong demand in European markets.",
+          "vlm_caption": "Aerial view of a large factory floor with robotic arms assembling sleek electric sedans on a moving production line.",
+          "label": 0,
+          "negative_type": "same_keywords_wrong_context"
+        },
+        {
+          "video_id": "rivian_r1t_delivery",
+          "timestamp": "00:07:30",
+          "ocr": "Rivian R1T First Deliveries",
+          "asr": "Rivian handed over its first electric pickup trucks to customers at its Normal Illinois factory.",
+          "vlm_caption": "Employees in branded jackets hand over keys to customers beside green electric pickup trucks parked outside a large manufacturing facility.",
+          "label": 0,
+          "negative_type": "semantic_similarity_incorrect"
+        },
+        {
+          "video_id": "tesla_cybertruck_reveal_2019",
+          "timestamp": "00:20:10",
+          "ocr": "Tesla Cybertruck — Unveil Event 2019",
+          "asr": "Elon Musk unveiled the Tesla Cybertruck prototype at the Design Studio, describing its bulletproof stainless steel exoskeleton.",
+          "vlm_caption": "A man stands next to a large angular silver vehicle with dramatic lighting on a dark stage. Audience members point cameras at the unusual-shaped truck.",
+          "label": 0,
+          "negative_type": "same_entity_wrong_event"
+        },
+        {
+          "video_id": "tsla_cybrtrck_dlvry_23",
+          "timestamp": "00:14:55",
+          "ocr": "Tsla Cybrtrck Dlvry Evnt",
+          "asr": "Elan Musc deliverd frist Cybr Truck vehicls to custmers at the Texa Gigafactry.",
+          "vlm_caption": "Blurry footage of angular metallic trucks parked inside a warehouse. People in casual clothes stand near the vehicles.",
+          "label": 0,
+          "negative_type": "ocr_asr_noise"
+        }
+      ]
+    },
+    {
+      "query_id": "Q03",
+      "query": "Company reveals an AI productivity assistant for office software",
+      "candidates": [
+        {
+          "video_id": "microsoft_copilot_announce_2023",
+          "timestamp": "00:09:18",
+          "ocr": "Microsoft 365 Copilot — Powered by AI",
+          "asr": "Microsoft CEO Satya Nadella announced Copilot, an AI assistant integrated across Word, Excel, PowerPoint and Teams.",
+          "vlm_caption": "A man in a suit gestures toward a large display showing familiar office applications with a glowing AI interface overlay in a modern auditorium.",
+          "label": 1,
+          "negative_type": "positive"
+        },
+        {
+          "video_id": "microsoft_surface_event",
+          "timestamp": "00:05:00",
+          "ocr": "Microsoft Surface Pro 10 — New Design",
+          "asr": "Microsoft unveiled the new Surface Pro lineup with improved displays and longer battery life for productivity users.",
+          "vlm_caption": "A presenter holds up a slim tablet with a keyboard attachment on a bright stage. Audience members take photos with their phones.",
+          "label": 0,
+          "negative_type": "same_entity_wrong_event"
+        },
+        {
+          "video_id": "google_bard_announcement",
+          "timestamp": "00:11:30",
+          "ocr": "Google Bard — Conversational AI",
+          "asr": "Google's CEO introduced Bard, the company's conversational AI assistant powered by the PaLM language model.",
+          "vlm_caption": "A man on stage points to a screen showing a chat interface with an AI assistant responding to typed questions. Google branding is visible in the background.",
+          "label": 0,
+          "negative_type": "semantic_similarity_incorrect"
+        },
+        {
+          "video_id": "microsoft_copilot_tutorial",
+          "timestamp": "00:03:22",
+          "ocr": "Microsoft Copilot — Tutorial and Tips",
+          "asr": "In this tutorial we explore how to use Microsoft Copilot features in your daily Word and Excel workflows.",
+          "vlm_caption": "A screen recording shows a person typing in Microsoft Word while an AI chat panel on the right side of the screen generates text automatically.",
+          "label": 0,
+          "negative_type": "same_keywords_wrong_context"
+        },
+        {
+          "video_id": "microsft_coplot_anouncement",
+          "timestamp": "00:09:00",
+          "ocr": "Microsft Coplot — Powed by AI",
+          "asr": "Micsrooft anounced Copliot intergated acros Office aplications for produktivity and colaboration.",
+          "vlm_caption": "Grainy footage of a stage with partially visible logos. A speaker gestures toward a screen with text that is difficult to read.",
+          "label": 0,
+          "negative_type": "ocr_asr_noise"
+        }
+      ]
+    },
+    {
+      "query_id": "Q04",
+      "query": "Doctor explains how the COVID vaccine works to patients",
+      "candidates": [
+        {
+          "video_id": "cdc_covid_vaccine_explainer",
+          "timestamp": "00:04:55",
+          "ocr": "COVID-19 Vaccination — How mRNA Vaccines Work",
+          "asr": "The doctor explained the mRNA vaccination process, describing how the vaccine trains the immune system to recognize the coronavirus spike protein.",
+          "vlm_caption": "A doctor in a white coat stands in a clinic, pointing to a medical diagram of a cell on a screen and gesturing to a small vaccine vial on the table.",
+          "label": 1,
+          "negative_type": "positive"
+        },
+        {
+          "video_id": "influenza_treatment_guide",
+          "timestamp": "00:06:12",
+          "ocr": "Influenza Treatment — Antiviral Medications",
+          "asr": "A physician discussed treatment options for influenza, including antiviral drugs and supportive care for patients.",
+          "vlm_caption": "A doctor sits across from a patient in a consultation room, holding a tablet and pointing to medication options on the screen.",
+          "label": 0,
+          "negative_type": "semantic_similarity_incorrect"
+        },
+        {
+          "video_id": "covid_pcr_testing_procedure",
+          "timestamp": "00:02:30",
+          "ocr": "COVID-19 PCR Test — How It Works",
+          "asr": "The nurse demonstrated how a COVID-19 PCR test sample is collected and processed in the laboratory.",
+          "vlm_caption": "A nurse in PPE inserts a swab into a patient's nose. Lab equipment and test tubes are visible in the background.",
+          "label": 0,
+          "negative_type": "same_entity_wrong_event"
+        },
+        {
+          "video_id": "hospital_general_health_tips",
+          "timestamp": "00:08:40",
+          "ocr": "Healthy Living — Doctor Advice",
+          "asr": "The doctor shared general advice on maintaining a healthy lifestyle including diet, exercise, and regular medical check-ups.",
+          "vlm_caption": "A doctor in a white coat talks to the camera in a bright hospital corridor, gesturing with their hands in a friendly manner.",
+          "label": 0,
+          "negative_type": "same_keywords_wrong_context"
+        },
+        {
+          "video_id": "covid19_vax_explainr_noisy",
+          "timestamp": "00:04:50",
+          "ocr": "CVID-19 Vaccinatin — mRNa Vacines Wrk",
+          "asr": "The docter explaned how mRNA vacin trains the immun sistm to recgnize coronvirus spik proteyn.",
+          "vlm_caption": "Low quality footage of a medical professional standing in front of a poster with partially visible text about vaccines.",
+          "label": 0,
+          "negative_type": "ocr_asr_noise"
+        }
+      ]
+    },
+    {
+      "query_id": "Q05",
+      "query": "Football players prepare physically before a World Cup game",
+      "candidates": [
+        {
+          "video_id": "worldcup2022_argentina_training",
+          "timestamp": "00:07:44",
+          "ocr": "FIFA World Cup 2022 — Argentina Training Session",
+          "asr": "The Argentine national team conducted an intense training session at Al Shamal stadium ahead of their World Cup quarter-final match.",
+          "vlm_caption": "A football team in light blue and white jerseys runs drills and passes the ball on a green training pitch. Coaching staff observe from the sideline.",
+          "label": 1,
+          "negative_type": "positive"
+        },
+        {
+          "video_id": "worldcup2022_argentina_final_highlights",
+          "timestamp": "00:35:10",
+          "ocr": "FIFA World Cup 2022 — Final Match Highlights",
+          "asr": "Messi scored in extra time as Argentina defeated France on penalties in the World Cup final at Lusail Stadium.",
+          "vlm_caption": "Players in blue and white jerseys celebrate on a pitch surrounded by a massive crowd. Confetti falls from the stadium roof as players embrace.",
+          "label": 0,
+          "negative_type": "same_entity_wrong_event"
+        },
+        {
+          "video_id": "nba_lakers_pre_season_training",
+          "timestamp": "00:12:00",
+          "ocr": "LA Lakers Pre-Season Training Camp",
+          "asr": "LeBron James led an intensive practice session as the Lakers prepared for the upcoming NBA season opener.",
+          "vlm_caption": "Tall athletes in purple and gold shorts practice basketball drills on an indoor court. Coaches watch and take notes on clipboards.",
+          "label": 0,
+          "negative_type": "semantic_similarity_incorrect"
+        },
+        {
+          "video_id": "euro2024_germany_training",
+          "timestamp": "00:05:20",
+          "ocr": "UEFA Euro 2024 — Germany Training Session",
+          "asr": "The German national team trained ahead of their group stage match in the European Championship tournament.",
+          "vlm_caption": "Football players in white jerseys with black shorts do passing drills on a training pitch. A UEFA banner is visible on the fence.",
+          "label": 0,
+          "negative_type": "same_keywords_wrong_context"
+        }
+      ]
+    },
+    {
+      "query_id": "Q06",
+      "query": "Airline staff makes a boarding announcement at the gate",
+      "candidates": [
+        {
+          "video_id": "vietnam_airlines_hanoi_boarding",
+          "timestamp": "00:01:30",
+          "ocr": "Vietnam Airlines — Gate 12 Boarding Now",
+          "asr": "Vietnam Airlines ground staff announced boarding for flight VN214 to Ho Chi Minh City. Passengers please proceed to gate 12.",
+          "vlm_caption": "An airport gate agent in a blue uniform speaks into a microphone at a boarding desk. A queue of passengers with luggage forms behind the barrier.",
+          "label": 1,
+          "negative_type": "positive"
+        },
+        {
+          "video_id": "vietjet_air_gate_change",
+          "timestamp": "00:00:45",
+          "ocr": "VietJet Air — Gate Change Announcement",
+          "asr": "VietJet Air staff announced a gate change for flight VJ188. Passengers please proceed to gate 7 immediately.",
+          "vlm_caption": "An airport employee in a red uniform points toward a different part of the terminal. A departures board behind them shows flight information.",
+          "label": 0,
+          "negative_type": "same_keywords_wrong_context"
+        },
+        {
+          "video_id": "vietnam_airlines_route_review",
+          "timestamp": "00:10:15",
+          "ocr": "Vietnam Airlines — Hanoi to Tokyo Route Review",
+          "asr": "In this travel vlog we review the Vietnam Airlines business class experience on the Hanoi to Tokyo long haul route.",
+          "vlm_caption": "A travel vlogger sits in a wide business class seat on an aircraft. A meal tray with food is placed in front of them and they gesture toward the window.",
+          "label": 0,
+          "negative_type": "same_entity_wrong_event"
+        },
+        {
+          "video_id": "singapore_airlines_boarding",
+          "timestamp": "00:02:00",
+          "ocr": "Singapore Airlines — Priority Boarding",
+          "asr": "Singapore Airlines announced priority boarding for business class and KrisFlyer elite members at gate B14.",
+          "vlm_caption": "A gate agent in a navy blue uniform scans boarding passes while passengers in formal and business attire walk past in an orderly queue.",
+          "label": 0,
+          "negative_type": "semantic_similarity_incorrect"
+        },
+        {
+          "video_id": "vtnam_arlines_brdng_noisy",
+          "timestamp": "00:01:28",
+          "ocr": "VietnamAirlns — Gte 12 Brdng Nw",
+          "asr": "Veitnam Airlin grond staf anounced bording for flght VN214 to Ho Chi Mihn Cty.",
+          "vlm_caption": "Shaky handheld footage of an airport gate area. A blurry figure stands at the boarding desk and people with bags move in the background.",
+          "label": 0,
+          "negative_type": "ocr_asr_noise"
+        }
+      ]
+    },
+    {
+      "query_id": "Q07",
+      "query": "Photographer reviews a professional mirrorless camera hands-on",
+      "candidates": [
+        {
+          "video_id": "canon_eos_r5_review",
+          "timestamp": "00:05:30",
+          "ocr": "Canon EOS R5 — Full Frame Mirrorless Review",
+          "asr": "The photographer gave a detailed hands-on review of the Canon EOS R5, praising its 45 megapixel sensor and 8K video recording capability.",
+          "vlm_caption": "A person holds a large black camera body up to the lens and inspects it closely on a desk covered with photography equipment and accessories.",
+          "label": 1,
+          "negative_type": "positive"
+        },
+        {
+          "video_id": "nikon_z9_mirrorless_review",
+          "timestamp": "00:06:45",
+          "ocr": "Nikon Z9 — Professional Mirrorless Review",
+          "asr": "The reviewer tested the Nikon Z9 flagship mirrorless camera, highlighting its 45 megapixel stacked sensor and subject tracking autofocus.",
+          "vlm_caption": "A person in a studio examines a black camera body with a large lens attached. Sample photos are displayed on a monitor in the background.",
+          "label": 0,
+          "negative_type": "semantic_similarity_incorrect"
+        },
+        {
+          "video_id": "canon_rf_lens_comparison",
+          "timestamp": "00:03:10",
+          "ocr": "Canon RF 50mm vs 85mm — Lens Comparison",
+          "asr": "We compare two Canon RF lenses to determine which performs better for portrait photography when paired with the EOS R5.",
+          "vlm_caption": "Two camera lenses of different sizes are placed side by side on a wooden surface. Portrait photos shot with each lens are displayed on a laptop screen.",
+          "label": 0,
+          "negative_type": "same_keywords_wrong_context"
+        },
+        {
+          "video_id": "smartphone_vs_dslr_shootout",
+          "timestamp": "00:09:00",
+          "ocr": "iPhone 15 Pro vs Canon DSLR — Camera Shootout",
+          "asr": "We test whether a modern smartphone camera can compete with a professional DSLR in real world photography scenarios.",
+          "vlm_caption": "A person photographs a street scene holding a smartphone in one hand and a large DSLR camera in the other, switching between the two for comparison.",
+          "label": 0,
+          "negative_type": "same_entity_wrong_event"
+        },
+        {
+          "video_id": "canonEOSRS_rvw_noisy",
+          "timestamp": "00:05:25",
+          "ocr": "CanonEOSRS — Ful Frme Mrrlss Rvw",
+          "asr": "Fotgrapher gav hands-on reviw of Cannon EOS R5 camra with 45 megapixl sensr and 8K vido capabilty.",
+          "vlm_caption": "Poorly lit footage of a person holding a camera. The details of the equipment are difficult to distinguish due to low light and shaky footage.",
+          "label": 0,
+          "negative_type": "ocr_asr_noise"
+        }
+      ]
+    },
+    {
+      "query_id": "Q08",
+      "query": "Sneaker brand drops a limited edition basketball shoe collection",
+      "candidates": [
+        {
+          "video_id": "nike_air_jordan_38_release",
+          "timestamp": "00:03:20",
+          "ocr": "Nike Air Jordan 38 — Limited Drop",
+          "asr": "Nike unveiled the Air Jordan 38 limited edition colorways, available exclusively through the SNKRS app starting Friday.",
+          "vlm_caption": "A brightly lit display shows colorful basketball shoes rotating on a pedestal. Sneaker enthusiasts crowd around to photograph them.",
+          "label": 1,
+          "negative_type": "positive"
+        },
+        {
+          "video_id": "nike_pegasus_running_launch",
+          "timestamp": "00:04:55",
+          "ocr": "Nike Pegasus 41 — Running Shoe Launch",
+          "asr": "Nike introduced the Pegasus 41 running shoes designed for marathon runners with enhanced ZoomX foam cushioning technology.",
+          "vlm_caption": "An athlete in running gear jogs past the camera wearing bright neon shoes. A Nike banner is visible in the background of an outdoor track.",
+          "label": 0,
+          "negative_type": "same_entity_wrong_event"
+        },
+        {
+          "video_id": "adidas_gucci_basketball_collab",
+          "timestamp": "00:02:10",
+          "ocr": "Adidas x Gucci — Basketball Collection",
+          "asr": "Adidas and Gucci announced a luxury basketball shoe collaboration featuring limited edition designs inspired by court culture.",
+          "vlm_caption": "Luxury sneakers with mixed branding are displayed on white pedestals in a fashion boutique. Models wearing the shoes pose under spotlights.",
+          "label": 0,
+          "negative_type": "semantic_similarity_incorrect"
+        },
+        {
+          "video_id": "jordan_brand_40year_documentary",
+          "timestamp": "00:18:30",
+          "ocr": "Jordan Brand — 40 Years of History",
+          "asr": "This documentary explores the history of the Jordan Brand from Michael Jordan's first Nike contract to becoming a global lifestyle icon.",
+          "vlm_caption": "Archive footage of a basketball player dunking is interspersed with close-up shots of classic sneaker designs displayed in a museum-like setting.",
+          "label": 0,
+          "negative_type": "same_keywords_wrong_context"
+        },
+        {
+          "video_id": "nke_jrdn_drp_noisy",
+          "timestamp": "00:03:15",
+          "ocr": "Nke Ar Jrdn 38 — Lmtd Drp",
+          "asr": "Niike Air Jordn limitd editon colrway availble exclusvly thru SNK RS app on Fridy.",
+          "vlm_caption": "Out of focus shot of shoes on a shelf. Colors are visible but the shoe design and branding are not clearly identifiable.",
+          "label": 0,
+          "negative_type": "ocr_asr_noise"
+        }
+      ]
+    },
+    {
+      "query_id": "Q09",
+      "query": "Tech reviewer benchmarks the performance of a new laptop chip",
+      "candidates": [
+        {
+          "video_id": "macbook_pro_m4_benchmark",
+          "timestamp": "00:11:05",
+          "ocr": "MacBook Pro M4 — Geekbench & Cinebench Results",
+          "asr": "The reviewer ran Geekbench and Cinebench benchmarks on the new MacBook Pro with M4 chip, showing a 40 percent performance improvement over M3.",
+          "vlm_caption": "A person types on a laptop while benchmark software runs on the screen, showing graphs and numerical scores. Charts comparing different processor generations are displayed.",
+          "label": 1,
+          "negative_type": "positive"
+        },
+        {
+          "video_id": "macbook_pro_m3_benchmark",
+          "timestamp": "00:10:30",
+          "ocr": "MacBook Pro M3 — Performance Benchmark",
+          "asr": "The M3 MacBook Pro benchmark results showed significant improvements over the M2 generation in multi-core CPU and GPU workloads.",
+          "vlm_caption": "A silver laptop sits on a desk with performance test software open. Bar charts on the screen show CPU scores across different processor models.",
+          "label": 0,
+          "negative_type": "same_entity_wrong_event"
+        },
+        {
+          "video_id": "dell_xps_intel_benchmark",
+          "timestamp": "00:08:20",
+          "ocr": "Dell XPS 15 — Intel Core Ultra Benchmark",
+          "asr": "The Dell XPS 15 with Intel Core Ultra processor was benchmarked in Cinebench and PCMark to assess real-world performance.",
+          "vlm_caption": "A black laptop with a slim bezel is shown with benchmark results on screen. A reviewer points to performance score comparisons shown as bar graphs.",
+          "label": 0,
+          "negative_type": "semantic_similarity_incorrect"
+        },
+        {
+          "video_id": "macbook_pro_m4_unboxing",
+          "timestamp": "00:02:45",
+          "ocr": "MacBook Pro M4 — Unboxing and First Look",
+          "asr": "We unbox the brand new MacBook Pro M4 and take a first look at the build quality, port selection, and display quality.",
+          "vlm_caption": "Hands carefully remove a silver laptop from a white box. The person lifts the lid and powers on the device for the first time.",
+          "label": 0,
+          "negative_type": "same_keywords_wrong_context"
+        },
+        {
+          "video_id": "macbk_m4_bnch_noisy",
+          "timestamp": "00:11:00",
+          "ocr": "MacBok Pr0 M4 — GeekBnch & CinBnch Rsults",
+          "asr": "Reviwr ran Geekbanch and Cinabench on MacBok M4 chip showin 40 persent improovment ovr M3.",
+          "vlm_caption": "Slightly blurry screen showing what appears to be benchmark software with numbers and charts. Details are hard to read.",
+          "label": 0,
+          "negative_type": "ocr_asr_noise"
+        }
+      ]
+    },
+    {
+      "query_id": "Q10",
+      "query": "Car journalist tests a compact sedan on a race track",
+      "candidates": [
+        {
+          "video_id": "honda_civic_type_r_track_test",
+          "timestamp": "00:08:15",
+          "ocr": "Honda Civic Type R — Track Day Test Lap",
+          "asr": "The automotive journalist pushed the Honda Civic Type R to its limits at Fuji Speedway, recording a lap time and discussing the car's handling balance.",
+          "vlm_caption": "A red hatchback with a large rear wing races around a circuit. The driver is helmeted and the car slides through corners at high speed with tires smoking.",
+          "label": 1,
+          "negative_type": "positive"
+        },
+        {
+          "video_id": "honda_civic_daily_road_review",
+          "timestamp": "00:05:50",
+          "ocr": "Honda Civic — Daily Driver Road Review",
+          "asr": "The reviewer tested the Honda Civic on public roads, evaluating ride comfort, fuel economy, and infotainment usability.",
+          "vlm_caption": "A person drives a compact car through city streets. They speak to a camera mounted on the dashboard, gesturing toward the touchscreen.",
+          "label": 0,
+          "negative_type": "same_entity_wrong_event"
+        },
+        {
+          "video_id": "toyota_corolla_grsport_track",
+          "timestamp": "00:09:40",
+          "ocr": "Toyota Corolla GR Sport — Track Test",
+          "asr": "We take the Toyota Corolla GR Sport to the circuit to see how it performs against rivals in a timed lap session.",
+          "vlm_caption": "A white compact car drives around a race circuit. Timing equipment is visible on the dashboard and the car corners aggressively.",
+          "label": 0,
+          "negative_type": "same_keywords_wrong_context"
+        },
+        {
+          "video_id": "f1_vs_civic_lap_comparison",
+          "timestamp": "00:04:00",
+          "ocr": "F1 Car vs Honda Civic Type R — Lap Time Comparison",
+          "asr": "We compare the lap times of a Formula 1 car against a Honda Civic Type R on the same circuit to illustrate the performance gap.",
+          "vlm_caption": "Split screen showing a Formula 1 car and a red hatchback both driving around the same circuit. A timer overlay shows their respective lap times.",
+          "label": 0,
+          "negative_type": "semantic_similarity_incorrect"
+        },
+        {
+          "video_id": "hnda_cvc_trck_noisy",
+          "timestamp": "00:08:10",
+          "ocr": "Hnda Cvic Typ R — Trck Dy Tst Lp",
+          "asr": "Automotiv jurnlist push Hond Civic Typ R to limits at Fuji Speedwy recrding lap tme and discusing handlng.",
+          "vlm_caption": "Shaky on-board camera footage from inside a car driving quickly around a track. The surroundings are blurry and the driver's hands grip the wheel tightly.",
+          "label": 0,
+          "negative_type": "ocr_asr_noise"
+        }
+      ]
+    }
+  ]
+}

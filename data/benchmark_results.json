@@ -1,0 +1,44 @@
+{
+  "overall": {
+    "Elasticsearch BM25": {
+      "MRR": 0.7167,
+      "Recall@1": 0.5,
+      "Recall@5": 1.0,
+      "NDCG@5": 0.7893
+    },
+    "BGE-M3 raw": {
+      "MRR": 0.85,
+      "Recall@1": 0.7,
+      "Recall@5": 1.0,
+      "NDCG@5": 0.8893
+    },
+    "BGE-M3 + VLM Context": {
+      "MRR": 0.8333,
+      "Recall@1": 0.7,
+      "Recall@5": 1.0,
+      "NDCG@5": 0.8762
+    }
+  },
+  "per_negative_type_confusion": {
+    "same_keywords_wrong_context": {
+      "Elasticsearch BM25": 0.1,
+      "BGE-M3 raw": 0.2,
+      "BGE-M3 + VLM Context": 0.3
+    },
+    "ocr_asr_noise": {
+      "Elasticsearch BM25": 0.1111,
+      "BGE-M3 raw": 0.0,
+      "BGE-M3 + VLM Context": 0.0
+    },
+    "semantic_similarity_incorrect": {
+      "Elasticsearch BM25": 0.4,
+      "BGE-M3 raw": 0.1,
+      "BGE-M3 + VLM Context": 0.0
+    },
+    "same_entity_wrong_event": {
+      "Elasticsearch BM25": 0.1,
+      "BGE-M3 raw": 0.0,
+      "BGE-M3 + VLM Context": 0.1
+    }
+  }
+}
