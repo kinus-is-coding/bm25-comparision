@@ -3,27 +3,12 @@ video_retrieval_benchmark.py
 -----------------------------
 Prototype benchmark comparing:
   1. Elasticsearch BM25           — exact keyword retrieval on OCR+ASR
-  2. BGE-M3 raw                   — semantic retrieval on OCR+ASR
-  3. BGE-M3 + VLM Context         — semantic retrieval on VLM caption + OCR + ASR
-
-Research question:
-  Does BGE-M3 with VLM Contextual Retrieval outperform Elasticsearch BM25
-  for video OCR/ASR retrieval when queries are semantic descriptions
-  rather than exact keyword matches?
-
-Pipeline (BGE-M3 + VLM Context):
-  Video segment (OCR + ASR + keyframe VLM caption)
-    → make_vlm_contextual_text()
-    → BGE-M3 embedding
-    → cosine similarity ranking
+  2. BGE-M3 raw                   — semantic retrieval on OCR+ASR only
+  3. BGE-M3 + VLM-structured      — semantic retrieval with section markers
+  4. BGE-M3 + VLM-late-fusion     — multi-vector weighted fusion
 
 Run:
     python scripts/video_retrieval_benchmark.py
-
-Notes:
-- BGE-M3 requires: pip install FlagEmbedding
-- Elasticsearch must be running for the BM25 leg; skipped gracefully if not.
-- To replace mock VLM with a real model: swap mock_vlm_caption() — signature unchanged.
 """
 
 from __future__ import annotations
@@ -55,61 +40,36 @@ DATASET_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "benchmark_
 ES_URL = os.getenv("ES_URL", "http://localhost:9200")
 TOP_K = 5
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 1.  VLM CONTEXTUAL ENRICHMENT
-# ─────────────────────────────────────────────────────────────────────────────
+# ── VLM CAPTION ──────────────────────────────────────────────────────────────
 
 def mock_vlm_caption(ocr: str, asr: str, candidate: Optional[dict] = None) -> str:
-    """
-    Mock VLM caption generator.
-
-    In production this would call a Vision-Language Model (e.g. GPT-4o,
-    LLaVA, Gemini) on the video keyframe to produce a visual description.
-
-    Priority order:
-      1. Use the pre-stored vlm_caption from the dataset (most realistic).
-      2. Fall back to a rule-based description from OCR + ASR text.
-
-    To replace with a real VLM API:
-        def real_vlm_caption(frame_path: str) -> str:
-            response = openai.chat.completions.create(
-                model="gpt-4o",
-                messages=[{"role": "user", "content": [
-                    {"type": "image_url", "image_url": {"url": frame_path}},
-                    {"type": "text", "text": "Describe this video frame in one sentence."}
-                ]}]
-            )
-            return response.choices[0].message.content.strip()
-    """
     if candidate and candidate.get("vlm_caption"):
         return candidate["vlm_caption"]
-    # Rule-based fallback
     return f"A video frame showing: {ocr}."
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 2.  TEXT PREPARATION
-# ─────────────────────────────────────────────────────────────────────────────
+# ── TEXT PREPARATION ─────────────────────────────────────────────────────────
 
 def make_chunk_text(ocr: str, asr: str) -> str:
-    """Raw OCR + ASR — used by BM25 index and raw BGE-M3."""
     return f"{ocr} {asr}".strip()
 
 
-def make_vlm_contextual_text(candidate: dict) -> str:
-    """
-    VLM caption + OCR + ASR — used by BGE-M3 + VLM Context.
-
-    The VLM caption is placed first so the embedding model sees
-    the visual description before the noisy OCR/ASR tokens.
-    """
+def make_vlm_contextual_text(candidate: dict, style: str = "structured") -> str:
     vlm = mock_vlm_caption(candidate["ocr"], candidate["asr"], candidate)
-    return f"{vlm} {candidate['ocr']} {candidate['asr']}".strip()
+
+    if style == "concat":
+        return f"{vlm} {candidate['ocr']} {candidate['asr']}".strip()
+    elif style == "structured":
+        return f"[VISUAL] {vlm}\n[OCR] {candidate['ocr']}\n[ASR] {candidate['asr']}"
+    elif style == "instruction":
+        return f"Visual description: {vlm}\nText on screen: {candidate['ocr']}\nSpoken: {candidate['asr']}"
+    elif style == "weighted_prefix":
+        return f"IMPORTANT - Scene: {vlm}\nSecondary - OCR: {candidate['ocr']}\nSecondary - ASR: {candidate['asr']}"
+    else:
+        raise ValueError(f"Unknown style: {style}")
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 3.  ELASTICSEARCH BM25 RETRIEVAL
-# ─────────────────────────────────────────────────────────────────────────────
+# ── ELASTICSEARCH BM25 ───────────────────────────────────────────────────────
 
 def _es_client() -> Optional["Elasticsearch"]:
     if not ES_AVAILABLE:
@@ -122,7 +82,6 @@ def _es_client() -> Optional["Elasticsearch"]:
 
 
 def _es_index_candidates(es: "Elasticsearch", candidates: List[dict]) -> None:
-    """Index all candidates into a temporary ES index for this query."""
     idx = "benchmark_tmp"
     if es.indices.exists(index=idx):
         es.indices.delete(index=idx)
@@ -147,21 +106,10 @@ def _es_index_candidates(es: "Elasticsearch", candidates: List[dict]) -> None:
         },
     )
     for i, c in enumerate(candidates):
-        es.index(
-            index=idx,
-            id=str(i),
-            body={"chunk_text": make_chunk_text(c["ocr"], c["asr"])},
-            refresh=True,
-        )
+        es.index(index=idx, id=str(i), body={"chunk_text": make_chunk_text(c["ocr"], c["asr"])}, refresh=True)
 
 
-def retrieve_bm25(
-    es: "Elasticsearch",
-    query: str,
-    candidates: List[dict],
-    top_k: int = TOP_K,
-) -> List[Tuple[int, float]]:
-    """Returns [(candidate_idx, bm25_score), ...] descending."""
+def retrieve_bm25(es: "Elasticsearch", query: str, candidates: List[dict], top_k: int = TOP_K) -> List[Tuple[int, float]]:
     _es_index_candidates(es, candidates)
     res = es.search(
         index="benchmark_tmp",
@@ -177,10 +125,7 @@ def retrieve_bm25(
             },
         },
     )
-    ranked: List[Tuple[int, float]] = [
-        (int(h["_id"]), float(h["_score"])) for h in res["hits"]["hits"]
-    ]
-    # Append unscored candidates at the bottom
+    ranked = [(int(h["_id"]), float(h["_score"])) for h in res["hits"]["hits"]]
     ranked_ids = {r[0] for r in ranked}
     for i in range(len(candidates)):
         if i not in ranked_ids:
@@ -188,9 +133,7 @@ def retrieve_bm25(
     return ranked
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 4.  BGE-M3 SEMANTIC RETRIEVAL
-# ─────────────────────────────────────────────────────────────────────────────
+# ── BGE-M3 ───────────────────────────────────────────────────────────────────
 
 _bge_model: Optional["BGEM3FlagModel"] = None
 
@@ -200,7 +143,7 @@ def _get_bge_model() -> Optional["BGEM3FlagModel"]:
     if not BGE_AVAILABLE:
         return None
     if _bge_model is None:
-        print("  [BGE-M3] Loading model (first call — may take a moment)...")
+        print("  [BGE-M3] Loading model...")
         _bge_model = BGEM3FlagModel("BAAI/bge-m3", use_fp16=True)
     return _bge_model
 
@@ -212,35 +155,93 @@ def _cosine(a: List[float], b: List[float]) -> float:
     return dot / (na * nb) if na and nb else 0.0
 
 
-def retrieve_bge_m3(
-    model: "BGEM3FlagModel",
-    query: str,
-    candidates: List[dict],
-    use_vlm_context: bool = False,
-) -> List[Tuple[int, float]]:
-    """
-    Returns [(candidate_idx, cosine_similarity), ...] descending.
-    use_vlm_context=True → embed VLM caption + OCR + ASR.
-    use_vlm_context=False → embed OCR + ASR only (raw baseline).
-    """
-    if use_vlm_context:
-        texts = [make_vlm_contextual_text(c) for c in candidates]
+def retrieve_bge_m3_single(model, query: str, candidates: List[dict], use_vlm: bool = False, style: str = "structured") -> List[Tuple[int, float]]:
+    """Single-vector embedding (concat or structured)."""
+    if use_vlm:
+        texts = [make_vlm_contextual_text(c, style=style) for c in candidates]
     else:
         texts = [make_chunk_text(c["ocr"], c["asr"]) for c in candidates]
 
     embeddings = model.encode([query] + texts, batch_size=12, max_length=512)["dense_vecs"]
     q_vec = embeddings[0].tolist()
-    scores = [
-        (i, _cosine(q_vec, embeddings[i + 1].tolist()))
-        for i in range(len(candidates))
-    ]
+    scores = [(i, _cosine(q_vec, embeddings[i + 1].tolist())) for i in range(len(candidates))]
     scores.sort(key=lambda x: x[1], reverse=True)
     return scores
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 5.  METRICS
-# ─────────────────────────────────────────────────────────────────────────────
+def retrieve_bge_m3_late_fusion(model, query: str, candidates: List[dict], 
+                                 w_vlm: float = 0, w_ocr: float = 0.6, w_asr: float = 0.4) -> List[Tuple[int, float]]:
+    """Late fusion: embed VLM, OCR, ASR separately then weighted combine."""
+    q_emb = model.encode([query], batch_size=1, max_length=512)["dense_vecs"][0]
+
+    scores = []
+    for i, c in enumerate(candidates):
+        vlm_text = mock_vlm_caption(c["ocr"], c["asr"], c)
+        ocr_text = c["ocr"]
+        asr_text = c["asr"]
+
+        embs = model.encode([vlm_text, ocr_text, asr_text], batch_size=3, max_length=512)["dense_vecs"]
+
+        sim_vlm = _cosine(q_emb.tolist(), embs[0].tolist())
+        sim_ocr = _cosine(q_emb.tolist(), embs[1].tolist())
+        sim_asr = _cosine(q_emb.tolist(), embs[2].tolist())
+
+        score = w_vlm * sim_vlm + w_ocr * sim_ocr + w_asr * sim_asr
+        scores.append((i, score))
+
+    scores.sort(key=lambda x: x[1], reverse=True)
+    return scores
+
+
+def retrieve_bge_m3_sparse_ocr_asr_dense_vlm(model, query: str, candidates: List[dict],
+                                               sparse_weight: float = 0.3, dense_weight: float = 0.7) -> List[Tuple[int, float]]:
+    """
+    Hybrid: Sparse trên OCR+ASR (exact keyword match) 
+            + Dense trên [VISUAL]+[OCR]+[ASR] (semantic).
+
+    Sparse giúp exact match keywords (OCR+ASR rõ ràng)
+    Dense giúp semantic understanding (VLM+OCR+ASR đầy đủ context)
+    """
+    # Dense: encode VLM+OCR+ASR structured
+    dense_texts = [make_vlm_contextual_text(c, style="structured") for c in candidates]
+    q_dense_output = model.encode([query], batch_size=1, max_length=512, return_dense=True)
+    c_dense_output = model.encode(dense_texts, batch_size=12, max_length=512, return_dense=True)
+
+    q_dense = q_dense_output["dense_vecs"][0]
+
+    # Sparse: encode OCR+ASR only
+    sparse_texts = [make_chunk_text(c["ocr"], c["asr"]) for c in candidates]
+    q_sparse_output = model.encode([query], batch_size=1, max_length=512, return_sparse=True)
+    c_sparse_output = model.encode(sparse_texts, batch_size=12, max_length=512, return_sparse=True)
+
+    q_sparse = q_sparse_output["lexical_weights"][0]
+
+    scores = []
+    for i in range(len(candidates)):
+        # Dense score (VLM+OCR+ASR)
+        c_dense = c_dense_output["dense_vecs"][i]
+        sim_dense = _cosine(q_dense.tolist(), c_dense.tolist())
+
+        # Sparse score (OCR+ASR only)
+        c_sparse = c_sparse_output["lexical_weights"][i]
+        sim_sparse = 0.0
+        common_tokens = set(q_sparse.keys()) & set(c_sparse.keys())
+        for tok in common_tokens:
+            sim_sparse += min(q_sparse[tok], c_sparse[tok])
+
+        if len(common_tokens) > 0:
+            q_norm = sum(abs(w) for w in q_sparse.values())
+            if q_norm > 0:
+                sim_sparse = sim_sparse / q_norm
+
+        # Combine
+        score = dense_weight * sim_dense + sparse_weight * sim_sparse
+        scores.append((i, score))
+
+    scores.sort(key=lambda x: x[1], reverse=True)
+    return scores
+
+# ── METRICS ──────────────────────────────────────────────────────────────────
 
 def compute_mrr(ranked: List[Tuple[int, float]], pos: int) -> float:
     for rank, (idx, _) in enumerate(ranked, 1):
@@ -262,16 +263,16 @@ def compute_ndcg_at_k(ranked: List[Tuple[int, float]], pos: int, k: int) -> floa
 
 def score_ranked(ranked: List[Tuple[int, float]], pos: int) -> Dict[str, float]:
     return {
-        "MRR":      compute_mrr(ranked, pos),
+        "MRR": compute_mrr(ranked, pos),
         "Recall@1": compute_recall_at_k(ranked, pos, 1),
         "Recall@5": compute_recall_at_k(ranked, pos, 5),
-        "NDCG@5":   compute_ndcg_at_k(ranked, pos, 5),
+        "Recall@10": compute_recall_at_k(ranked, pos, 10),
+        "NDCG@5": compute_ndcg_at_k(ranked, pos, 5),
+        "NDCG@10": compute_ndcg_at_k(ranked, pos, 10),
     }
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 6.  QUALITATIVE OUTPUT
-# ─────────────────────────────────────────────────────────────────────────────
+# ── QUALITATIVE OUTPUT ───────────────────────────────────────────────────────
 
 def _wrap(text: str, width: int = 70, pad: str = "    ") -> str:
     words, lines, line, length = text.split(), [], [], 0
@@ -299,112 +300,100 @@ def print_qualitative_case(
     pos: int,
     bm25_ranked: List[Tuple[int, float]],
     raw_ranked: List[Tuple[int, float]],
-    vlm_ranked: List[Tuple[int, float]],
+    structured_ranked: List[Tuple[int, float]],
+    late_fusion_ranked: List[Tuple[int, float]],
+    sparse_dense_ranked: List[Tuple[int, float]],
 ) -> None:
-    """
-    Print a detailed case block.
-    Shows ground truth, then the top-1 prediction of each method with
-    OCR / ASR / VLM caption / score / correct flag.
-    Triggered only when methods disagree or BGE-M3+VLM fixes a BM25 mistake.
-    """
-    SEP = "=" * 66
-    DIV = "-" * 66
+    """Print detailed comparison of all methods."""
+    SEP = "=" * 70
+    DIV = "-" * 70
 
-    bm25_top_idx, bm25_top_score = bm25_ranked[0]
-    vlm_top_idx,  vlm_top_score  = vlm_ranked[0]
+    bm25_top_idx = bm25_ranked[0][0] if bm25_ranked else -1
+    raw_top_idx = raw_ranked[0][0] if raw_ranked else -1
+    struct_top_idx = structured_ranked[0][0] if structured_ranked else -1
+    late_fusion_top_idx = late_fusion_ranked[0][0] if late_fusion_ranked else -1
+    sparse_dense_top_idx = sparse_dense_ranked[0][0] if sparse_dense_ranked else -1
 
     bm25_correct = bm25_top_idx == pos
-    vlm_correct  = vlm_top_idx  == pos
+    raw_correct = raw_top_idx == pos
+    struct_correct = struct_top_idx == pos
+    late_fusion_correct = late_fusion_top_idx == pos
+    sparse_dense_correct = sparse_dense_top_idx == pos
 
-    # Only print interesting cases
-    if bm25_correct and vlm_correct and bm25_top_idx == vlm_top_idx:
+    # Only print if there's disagreement
+    all_correct = [bm25_correct, raw_correct, struct_correct, late_fusion_correct, sparse_dense_correct]
+    all_top = [bm25_top_idx, raw_top_idx, struct_top_idx, late_fusion_top_idx, sparse_dense_top_idx]
+    if all(all_correct) and len(set(all_top)) == 1:
         return
 
     gt = candidates[pos]
 
     print(f"\n{SEP}")
     print(f"QUERY [{q['query_id']}]: {q['query']}")
+    print(f"Pool size: {len(candidates)} candidates")
     print(SEP)
 
-    # Ground truth
-    print()
-    print("GROUND TRUTH:")
+    print("\nGROUND TRUTH:")
     print(f"  video_id  : {gt['video_id']}")
     print(f"  timestamp : {gt['timestamp']}")
-    print("  OCR:")
-    print(_wrap(f'"{gt["ocr"]}"'))
-    print("  ASR:")
-    print(_wrap(f'"{gt["asr"]}"'))
-    print("  VLM Caption:")
-    print(_wrap(f'"{mock_vlm_caption(gt["ocr"], gt["asr"], gt)}"'))
+    print("  OCR:", _wrap(f'"{gt["ocr"]}"'))
+    print("  ASR:", _wrap(f'"{gt["asr"]}"'))
+    print("  VLM:", _wrap(f'"{mock_vlm_caption(gt["ocr"], gt["asr"], gt)}"'))
 
     print(f"\n{DIV}")
     print("METHOD RESULTS")
     print(DIV)
 
-    # Helper to print one method block
-    def _print_method(label: str, ranked: List[Tuple[int, float]], top_idx: int, top_score: float) -> None:
+    methods = [
+        ("BM25", bm25_ranked, bm25_top_idx),
+        ("BGE-M3 raw (OCR+ASR)", raw_ranked, raw_top_idx),
+        ("BGE-M3 + VLM-structured", structured_ranked, struct_top_idx),
+        ("BGE-M3 + LateFusion", late_fusion_ranked, late_fusion_top_idx),
+        ("BGE-M3 + SparseOCR-DenseVLM", sparse_dense_ranked, sparse_dense_top_idx),
+    ]
+
+    for label, ranked, top_idx in methods:
+        if not ranked:
+            continue
         correct = top_idx == pos
         rank_no, gt_score = _rank_of(ranked, pos)
         c = candidates[top_idx]
         mark = "✅" if correct else "❌"
-        print(f"\nMethod: {label}")
-        print(f"  Predicted video : {c['video_id']}")
-        if not correct:
-            print(f"  Negative type   : {c.get('negative_type', '—')}")
-        print(f"  Score           : {top_score:.4f}")
-        print(f"  Correct         : {mark} {'True' if correct else 'False'}")
-        print(f"  GT rank / score : #{rank_no if rank_no else '—'}  /  {gt_score:.4f}")
-        print("  Predicted OCR:")
-        print(_wrap(f'"{c["ocr"]}"'))
-        print("  Predicted ASR:")
-        print(_wrap(f'"{c["asr"]}"'))
-        if label == "BGE-M3 + VLM Context":
-            print("  VLM Caption used:")
-            print(_wrap(f'"{mock_vlm_caption(c["ocr"], c["asr"], c)}"'))
-
-    _print_method("BM25", bm25_ranked, bm25_top_idx, bm25_top_score)
-    _print_method("BGE-M3 + VLM Context", vlm_ranked, vlm_top_idx, vlm_top_score)
+        print(f"\n  {label}")
+        print(f"    Top-1: {c['video_id']}")
+        print(f"    Correct: {mark} | GT rank: #{rank_no if rank_no else '—'} | GT score: {gt_score:.4f}")
+        print(f"    OCR: {_wrap(c['ocr'])}")
 
     print(f"\n{DIV}")
-    if vlm_correct and not bm25_correct:
-        print(f"✅ BGE-M3+VLM fixed a BM25 mistake  "
-              f"(BM25 → '{candidates[bm25_top_idx]['video_id']}')")
-    elif bm25_correct and not vlm_correct:
-        print(f"⚠️  BM25 correct, BGE-M3+VLM wrong  "
-              f"(VLM → '{candidates[vlm_top_idx]['video_id']}')")
-    elif not bm25_correct and not vlm_correct:
-        print("❌ Both methods wrong")
+    # Summary
+    winners = [name for name, _, top in methods if top == pos]
+    if winners:
+        print(f"✅ Correct: {', '.join(winners)}")
     else:
-        print("ℹ️  Both correct but scored differently")
+        print("❌ All methods wrong")
     print(SEP)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 7.  MAIN BENCHMARK LOOP
-# ─────────────────────────────────────────────────────────────────────────────
+# ── MAIN BENCHMARK LOOP ──────────────────────────────────────────────────────
 
 def run_benchmark(dataset: dict) -> None:
     queries = dataset["queries"]
 
-    # ── Init backends ────────────────────────────────────────────────────────
     es = _es_client()
-    print("  ✅ Elasticsearch connected." if es
-          else "  ⚠️  Elasticsearch unavailable — BM25 skipped.")
+    print("  ✅ Elasticsearch connected." if es else "  ⚠️  Elasticsearch unavailable — BM25 skipped.")
 
     bge = _get_bge_model()
     if bge:
         print("  ✅ BGE-M3 model loaded.")
     else:
-        print("  ⚠️  FlagEmbedding not installed — BGE-M3 skipped.\n"
-              "       pip install FlagEmbedding")
+        print("  ⚠️  FlagEmbedding not installed — BGE-M3 skipped.\n       pip install FlagEmbedding")
 
     if not es and not bge:
         print("\n  ❌ No retrieval backend available. Exiting.")
         return
 
     method_scores: Dict[str, List[Dict[str, float]]] = defaultdict(list)
-    type_scores:   Dict[str, Dict[str, List[float]]] = defaultdict(lambda: defaultdict(list))
+    type_scores: Dict[str, Dict[str, List[float]]] = defaultdict(lambda: defaultdict(list))
     qualitative_cases = []
 
     print(f"\n{'─'*65}")
@@ -412,95 +401,116 @@ def run_benchmark(dataset: dict) -> None:
     print(f"{'─'*65}\n")
 
     for q in queries:
-        qid          = q["query_id"]
-        query_text   = q["query"]
-        candidates   = q["candidates"]
-        pos          = next(i for i, c in enumerate(candidates) if c["label"] == 1)
-        neg_types    = [c["negative_type"] for c in candidates if c["label"] == 0]
+        qid = q["query_id"]
+        query_text = q["query"]
+        candidates = q["candidates"]
+        pos = next(i for i, c in enumerate(candidates) if c["label"] == 1)
+        neg_types = [c["negative_type"] for c in candidates if c["label"] == 0]
 
-        ranked_bm25: List[Tuple[int, float]] = []
-        ranked_raw:  List[Tuple[int, float]] = []
-        ranked_vlm:  List[Tuple[int, float]] = []
-        m_bm25 = m_raw = m_vlm = {}
+        print(f"  [{qid}] {query_text} (pool: {len(candidates)})")
 
-        print(f"  [{qid}] {query_text}")
-
-        # BM25 ────────────────────────────────────────────────────────────────
+        # 1. BM25
+        ranked_bm25 = []
+        m_bm25 = {}
         if es:
             t0 = time.perf_counter()
             ranked_bm25 = retrieve_bm25(es, query_text, candidates)
             ms = (time.perf_counter() - t0) * 1000
             m_bm25 = score_ranked(ranked_bm25, pos)
             method_scores["Elasticsearch BM25"].append(m_bm25)
-            print(f"    BM25          MRR={m_bm25['MRR']:.2f}  R@1={m_bm25['Recall@1']:.0f}  "
-                  f"R@5={m_bm25['Recall@5']:.0f}  NDCG@5={m_bm25['NDCG@5']:.2f}  ({ms:.0f}ms)")
+            print(f"    BM25                  MRR={m_bm25['MRR']:.3f}  R@1={m_bm25['Recall@1']:.0f}  R@5={m_bm25['Recall@5']:.0f}  ({ms:.0f}ms)")
 
-        # BGE-M3 raw ──────────────────────────────────────────────────────────
+        # 2. BGE-M3 raw (OCR+ASR only)
+        ranked_raw = []
+        m_raw = {}
         if bge:
             t0 = time.perf_counter()
-            ranked_raw = retrieve_bge_m3(bge, query_text, candidates, use_vlm_context=False)
+            ranked_raw = retrieve_bge_m3_single(bge, query_text, candidates, use_vlm=False)
             ms = (time.perf_counter() - t0) * 1000
             m_raw = score_ranked(ranked_raw, pos)
             method_scores["BGE-M3 raw"].append(m_raw)
-            print(f"    BGE-M3 raw    MRR={m_raw['MRR']:.2f}  R@1={m_raw['Recall@1']:.0f}  "
-                  f"R@5={m_raw['Recall@5']:.0f}  NDCG@5={m_raw['NDCG@5']:.2f}  ({ms:.0f}ms)")
+            print(f"    BGE-M3 raw            MRR={m_raw['MRR']:.3f}  R@1={m_raw['Recall@1']:.0f}  R@5={m_raw['Recall@5']:.0f}  ({ms:.0f}ms)")
 
-        # BGE-M3 + VLM Context ────────────────────────────────────────────────
+        # 3. BGE-M3 + VLM-structured (chỉ giữ style tốt nhất)
+        style_results = {}
         if bge:
             t0 = time.perf_counter()
-            ranked_vlm = retrieve_bge_m3(bge, query_text, candidates, use_vlm_context=True)
+            ranked = retrieve_bge_m3_single(bge, query_text, candidates, use_vlm=True, style="structured")
             ms = (time.perf_counter() - t0) * 1000
-            m_vlm = score_ranked(ranked_vlm, pos)
-            method_scores["BGE-M3 + VLM Context"].append(m_vlm)
-            print(f"    BGE-M3+VLM    MRR={m_vlm['MRR']:.2f}  R@1={m_vlm['Recall@1']:.0f}  "
-                  f"R@5={m_vlm['Recall@5']:.0f}  NDCG@5={m_vlm['NDCG@5']:.2f}  ({ms:.0f}ms)")
+            m = score_ranked(ranked, pos)
+            label = "BGE-M3+VLM-structured"
+            method_scores[label].append(m)
+            style_results["structured"] = (ranked, m)
+            print(f"    {label:20s}  MRR={m['MRR']:.3f}  R@1={m['Recall@1']:.0f}  R@5={m['Recall@5']:.0f}  ({ms:.0f}ms)")
 
-        # Per-negative-type confusion accumulation ───────────────────────────
+        # 4. BGE-M3 + Late Fusion (multi-vector)
+        ranked_fusion = []
+        m_fusion = {}
+        if bge:
+            t0 = time.perf_counter()
+            ranked_fusion = retrieve_bge_m3_late_fusion(bge, query_text, candidates)
+            ms = (time.perf_counter() - t0) * 1000
+            m_fusion = score_ranked(ranked_fusion, pos)
+            method_scores["BGE-M3+LateFusion"].append(m_fusion)
+            print(f"    BGE-M3+LateFusion     MRR={m_fusion['MRR']:.3f}  R@1={m_fusion['Recall@1']:.0f}  R@5={m_fusion['Recall@5']:.0f}  ({ms:.0f}ms)")
+
+        # 5. BGE-M3 Sparse-OCR-ASR + Dense-VLM (ý tưởng mới)
+        ranked_sparse_dense = []
+        m_sparse_dense = {}
+        if bge:
+            t0 = time.perf_counter()
+            ranked_sparse_dense = retrieve_bge_m3_sparse_ocr_asr_dense_vlm(bge, query_text, candidates)
+            ms = (time.perf_counter() - t0) * 1000
+            m_sparse_dense = score_ranked(ranked_sparse_dense, pos)
+            method_scores["BGE-M3+SparseOCR-DenseVLM"].append(m_sparse_dense)
+            print(f"    BGE-M3+SparseOCR-DenseVLM  MRR={m_sparse_dense['MRR']:.3f}  R@1={m_sparse_dense['Recall@1']:.0f}  R@5={m_sparse_dense['Recall@5']:.0f}  ({ms:.0f}ms)")
+
+        # Per-negative-type confusion
         method_map = {}
-        if es:  method_map["Elasticsearch BM25"] = ranked_bm25
-        if bge: method_map["BGE-M3 raw"]         = ranked_raw
-        if bge: method_map["BGE-M3 + VLM Context"] = ranked_vlm
+        if es: method_map["Elasticsearch BM25"] = ranked_bm25
+        if bge: method_map["BGE-M3 raw"] = ranked_raw
+        if bge:
+            method_map["BGE-M3+VLM-structured"] = style_results["structured"][0]
+        if bge: method_map["BGE-M3+LateFusion"] = ranked_fusion
+        if bge: method_map["BGE-M3+SparseOCR-DenseVLM"] = ranked_sparse_dense
 
         for neg_type in set(neg_types):
-            neg_idxs = [i for i, c in enumerate(candidates)
-                        if c["label"] == 0 and c["negative_type"] == neg_type]
+            neg_idxs = [i for i, c in enumerate(candidates) if c["label"] == 0 and c["negative_type"] == neg_type]
             for method_label, ranked in method_map.items():
                 rank_map = {idx: rank for rank, (idx, _) in enumerate(ranked, 1)}
                 pos_rank = rank_map.get(pos, len(candidates) + 1)
                 confused = sum(1 for ni in neg_idxs if rank_map.get(ni, 999) < pos_rank)
-                type_scores[neg_type][method_label].append(
-                    confused / len(neg_idxs) if neg_idxs else 0.0
-                )
+                type_scores[neg_type][method_label].append(confused / len(neg_idxs) if neg_idxs else 0.0)
 
-        # Collect for qualitative output ──────────────────────────────────────
-        bm25_r1  = m_bm25.get("Recall@1", -1) if es  else -1
-        vlm_r1   = m_vlm.get("Recall@1",  -1) if bge else -1
-        bm25_mrr = m_bm25.get("MRR", -1)      if es  else -1
-        vlm_mrr  = m_vlm.get("MRR",  -1)      if bge else -1
-        if es and bge and ((bm25_r1 == 0) or (vlm_mrr > bm25_mrr)):
-            qualitative_cases.append((q, candidates, pos, ranked_bm25, ranked_raw, ranked_vlm))
+        # Qualitative: collect if BM25 missed OR structured improved
+        structured_ranked, m_struct = style_results.get("structured", ([], {}))
+        bm25_r1 = m_bm25.get("Recall@1", -1) if es else -1
+        struct_r1 = m_struct.get("Recall@1", -1) if m_struct else -1
+
+        if es and bge and (bm25_r1 == 0 or (struct_r1 > bm25_r1)):
+            qualitative_cases.append((
+                q, candidates, pos,
+                ranked_bm25, ranked_raw, structured_ranked, ranked_fusion, ranked_sparse_dense
+            ))
 
         print()
 
-    # ── Qualitative section ──────────────────────────────────────────────────
+    # ── Qualitative section ────────────────────────────────────────────────
     if qualitative_cases:
-        print(f"\n{'#'*66}")
+        print(f"\n{'#'*70}")
         print(f"  QUALITATIVE ANALYSIS — {len(qualitative_cases)} interesting case(s)")
-        print(f"  (BM25 missed rank-1  OR  BGE-M3+VLM improved MRR over BM25)")
-        print(f"{'#'*66}")
-        for (q, candidates, pos, rb, rr, rv) in qualitative_cases:
-            print_qualitative_case(q, candidates, pos, rb, rr, rv)
+        print(f"{'#'*70}")
+        for case in qualitative_cases:
+            print_qualitative_case(*case)
     else:
-        print("\n  ℹ️  No interesting cases — BM25 perfect on all queries.")
+        print("\n  ℹ️  No interesting cases — all methods agree.")
 
-    # ── Summary ──────────────────────────────────────────────────────────────
+    # ── Summary ────────────────────────────────────────────────────────────
     _print_summary(method_scores, type_scores)
     _save_results(method_scores, type_scores)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 8.  OUTPUT HELPERS
-# ─────────────────────────────────────────────────────────────────────────────
+# ── OUTPUT HELPERS ───────────────────────────────────────────────────────────
 
 def _avg(vals: List[float]) -> float:
     return sum(vals) / len(vals) if vals else 0.0
@@ -510,13 +520,10 @@ def _avg_m(scores: List[Dict[str, float]], metric: str) -> float:
     return _avg([s[metric] for s in scores])
 
 
-def _print_summary(
-    method_scores: Dict[str, List[Dict[str, float]]],
-    type_scores: Dict[str, Dict[str, List[float]]],
-) -> None:
+def _print_summary(method_scores, type_scores):
     methods = list(method_scores.keys())
-    metrics = ["MRR", "Recall@1", "Recall@5", "NDCG@5"]
-    W, C = 26, 11
+    metrics = ["MRR", "Recall@1", "Recall@5", "Recall@10", "NDCG@5", "NDCG@10"]
+    W, C = 26, 10
 
     print()
     print("=" * 72)
@@ -544,13 +551,10 @@ def _print_summary(
     print("=" * 72)
 
 
-def _save_results(
-    method_scores: Dict[str, List[Dict[str, float]]],
-    type_scores: Dict[str, Dict[str, List[float]]],
-) -> None:
+def _save_results(method_scores, type_scores):
     out = {
         "overall": {
-            method: {m: round(_avg_m(scores, m), 4) for m in ["MRR", "Recall@1", "Recall@5", "NDCG@5"]}
+            method: {m: round(_avg_m(scores, m), 4) for m in ["MRR", "Recall@1", "Recall@5", "Recall@10", "NDCG@5", "NDCG@10"]}
             for method, scores in method_scores.items()
         },
         "per_negative_type_confusion": {
@@ -564,20 +568,14 @@ def _save_results(
     print(f"\n  Results saved → {os.path.abspath(out_path)}")
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 9.  ENTRY POINT
-# ─────────────────────────────────────────────────────────────────────────────
+# ── ENTRY POINT ──────────────────────────────────────────────────────────────
 
-def main() -> None:
+def main():
     path = os.path.abspath(DATASET_PATH)
     if not os.path.exists(path):
-        raise FileNotFoundError(
-            f"Dataset not found: {path}\n"
-            "Run scripts/generate_benchmark.py first."
-        )
+        raise FileNotFoundError(f"Dataset not found: {path}")
     with open(path, "r", encoding="utf-8") as f:
         dataset = json.load(f)
-
     print(f"\nLoaded: {path}")
     print(f"Version: {dataset['version']}   Queries: {dataset['total_queries']}\n")
     run_benchmark(dataset)

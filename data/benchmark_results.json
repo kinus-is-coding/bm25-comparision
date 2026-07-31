@@ -4,41 +4,71 @@
       "MRR": 0.7167,
       "Recall@1": 0.5,
       "Recall@5": 1.0,
-      "NDCG@5": 0.7893
+      "Recall@10": 1.0,
+      "NDCG@5": 0.7893,
+      "NDCG@10": 0.7893
     },
     "BGE-M3 raw": {
       "MRR": 0.85,
       "Recall@1": 0.7,
       "Recall@5": 1.0,
-      "NDCG@5": 0.8893
+      "Recall@10": 1.0,
+      "NDCG@5": 0.8893,
+      "NDCG@10": 0.8893
     },
-    "BGE-M3 + VLM Context": {
-      "MRR": 0.8333,
-      "Recall@1": 0.7,
+    "BGE-M3+VLM-structured": {
+      "MRR": 0.8833,
+      "Recall@1": 0.8,
       "Recall@5": 1.0,
-      "NDCG@5": 0.8762
+      "Recall@10": 1.0,
+      "NDCG@5": 0.9131,
+      "NDCG@10": 0.9131
+    },
+    "BGE-M3+LateFusion": {
+      "MRR": 0.6833,
+      "Recall@1": 0.4,
+      "Recall@5": 1.0,
+      "Recall@10": 1.0,
+      "NDCG@5": 0.7655,
+      "NDCG@10": 0.7655
+    },
+    "BGE-M3+SparseOCR-DenseVLM": {
+      "MRR": 0.9,
+      "Recall@1": 0.8,
+      "Recall@5": 1.0,
+      "Recall@10": 1.0,
+      "NDCG@5": 0.9262,
+      "NDCG@10": 0.9262
     }
   },
   "per_negative_type_confusion": {
+    "semantic_similarity_incorrect": {
+      "Elasticsearch BM25": 0.4,
+      "BGE-M3 raw": 0.1,
+      "BGE-M3+VLM-structured": 0.0,
+      "BGE-M3+LateFusion": 0.3,
+      "BGE-M3+SparseOCR-DenseVLM": 0.2
+    },
     "same_keywords_wrong_context": {
       "Elasticsearch BM25": 0.1,
       "BGE-M3 raw": 0.2,
-      "BGE-M3 + VLM Context": 0.3
+      "BGE-M3+VLM-structured": 0.2,
+      "BGE-M3+LateFusion": 0.3,
+      "BGE-M3+SparseOCR-DenseVLM": 0.0
     },
     "ocr_asr_noise": {
       "Elasticsearch BM25": 0.1111,
       "BGE-M3 raw": 0.0,
-      "BGE-M3 + VLM Context": 0.0
-    },
-    "semantic_similarity_incorrect": {
-      "Elasticsearch BM25": 0.4,
-      "BGE-M3 raw": 0.1,
-      "BGE-M3 + VLM Context": 0.0
+      "BGE-M3+VLM-structured": 0.0,
+      "BGE-M3+LateFusion": 0.0,
+      "BGE-M3+SparseOCR-DenseVLM": 0.0
     },
     "same_entity_wrong_event": {
       "Elasticsearch BM25": 0.1,
       "BGE-M3 raw": 0.0,
-      "BGE-M3 + VLM Context": 0.1
+      "BGE-M3+VLM-structured": 0.1,
+      "BGE-M3+LateFusion": 0.1,
+      "BGE-M3+SparseOCR-DenseVLM": 0.0
     }
   }
 }
